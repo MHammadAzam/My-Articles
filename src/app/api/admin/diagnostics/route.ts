@@ -24,18 +24,26 @@ export async function GET() {
     host = "invalid-url";
   }
 
+  const checkKeyFormat = (k: string) => {
+    if (!k) return { configured: false };
+    return {
+      configured: true,
+      length: k.length,
+      isJWT: k.startsWith("eyJ"),
+      dotCount: (k.match(/\./g) || []).length,
+      hasBearer: k.toLowerCase().startsWith("bearer "),
+      startsWithSbp: k.startsWith("sbp_"),
+    };
+  };
+
   const envStatus = {
     NEXT_PUBLIC_SUPABASE_URL: {
       configured: Boolean(url && !url.includes("your-project-id")),
       host,
     },
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: {
-      configured: Boolean(anonKey && !anonKey.includes("your-supabase-anon-key")),
-      length: anonKey.length,
-    },
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: checkKeyFormat(anonKey),
     SUPABASE_SERVICE_ROLE_KEY: {
-      configured: Boolean(serviceKey && !serviceKey.includes("your-service-role-key")),
-      length: serviceKey.length,
+      ...checkKeyFormat(serviceKey),
       sameAsAnonKey: serviceKey === anonKey,
     },
     ADMIN_EMAIL: {
@@ -67,7 +75,15 @@ export async function GET() {
         .select("*", { count: "exact", head: true });
 
       if (error) {
-        serviceRoleTest = { success: false, error: `${error.code || ""}: ${error.message}` };
+        serviceRoleTest = {
+          success: false,
+          error: JSON.stringify({
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          }),
+        };
       } else {
         serviceRoleTest = { success: true, count };
       }
@@ -97,7 +113,15 @@ export async function GET() {
         .eq("status", "published");
 
       if (error) {
-        anonRoleTest = { success: false, error: `${error.code || ""}: ${error.message}` };
+        anonRoleTest = {
+          success: false,
+          error: JSON.stringify({
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          }),
+        };
       } else {
         anonRoleTest = { success: true, count };
       }
