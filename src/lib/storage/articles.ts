@@ -1,31 +1,49 @@
 import fs from "fs/promises";
 import path from "path";
 import { Article, ArticleInput } from "../types";
-import { createClient as createServerSupabase } from "../supabase/server";
+import { getAdminSupabaseClient } from "../supabase/admin";
 
 const DATA_FILE_PATH = path.join(process.cwd(), "data", "articles.json");
 
-// Helper to check if Supabase is properly configured
-function isSupabaseConfigured(): boolean {
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("your-project-url")
+    url &&
+    key &&
+    !url.includes("your-project-id") &&
+    !url.includes("your-project-url")
+  );
+}
+
+export function isServerlessEnvironment(): boolean {
+  return Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME
   );
 }
 
 // Fallback file-based operations
-async function readLocalFile(): Promise<Article[]> {
+export async function readLocalFile(): Promise<Article[]> {
   try {
     const raw = await fs.readFile(DATA_FILE_PATH, "utf-8");
     return JSON.parse(raw) as Article[];
   } catch (error) {
-    console.warn("Could not read local data file, initializing empty:", error);
+    console.warn("Could not read local data file, returning empty array:", error);
     return [];
   }
 }
 
-async function writeLocalFile(articles: Article[]): Promise<void> {
+export async function writeLocalFile(articles: Article[]): Promise<void> {
+  if (isServerlessEnvironment()) {
+    throw new Error(
+      "Read-only serverless environment: On Vercel, articles cannot be saved to the local file system. A persistent database (Supabase) must be configured in your Vercel Project Settings."
+    );
+  }
+
   try {
     const dir = path.dirname(DATA_FILE_PATH);
     await fs.mkdir(dir, { recursive: true });
@@ -36,6 +54,29 @@ async function writeLocalFile(articles: Article[]): Promise<void> {
   }
 }
 
+// Auto-seed Supabase with local articles if table is empty
+let isSeedingAttempted = false;
+async function autoSeedSupabaseIfEmpty(supabase: ReturnType<typeof getAdminSupabaseClient>) {
+  if (!supabase || isSeedingAttempted) return;
+  isSeedingAttempted = true;
+
+  try {
+    const { count, error } = await supabase
+      .from("articles")
+      .select("*", { count: "exact", head: true });
+
+    if (!error && (count === 0 || count === null)) {
+      const localArticles = await readLocalFile();
+      if (localArticles.length > 0) {
+        console.log(`[Auto-Seed] Seeding ${localArticles.length} initial articles into Supabase...`);
+        await supabase.from("articles").upsert(localArticles);
+      }
+    }
+  } catch (err) {
+    console.warn("[Auto-Seed] Skipped or errored:", err);
+  }
+}
+
 // ==========================================
 // PUBLIC METHODS (Strictly Published Only)
 // ==========================================
@@ -43,21 +84,25 @@ async function writeLocalFile(articles: Article[]): Promise<void> {
 export async function getPublishedArticles(): Promise<Article[]> {
   if (isSupabaseConfigured()) {
     try {
-      const supabase = await createServerSupabase();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
+        await autoSeedSupabaseIfEmpty(supabase);
+
         const { data, error } = await supabase
           .from("articles")
           .select("*")
           .eq("status", "published")
           .order("published_at", { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           return data as Article[];
         }
-        console.warn("Supabase query error, falling back to local store:", error);
+        if (error) {
+          console.warn("Supabase getPublishedArticles error, falling back:", error.message);
+        }
       }
     } catch (err) {
-      console.warn("Supabase client error, falling back:", err);
+      console.warn("Supabase client query error, falling back:", err);
     }
   }
 
@@ -78,19 +123,19 @@ export async function getArticleBySlug(
 ): Promise<Article | null> {
   if (isSupabaseConfigured()) {
     try {
-      const supabase = await createServerSupabase();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
         let query = supabase.from("articles").select("*").eq("slug", slug);
         if (!allowDrafts) {
           query = query.eq("status", "published");
         }
-        const { data, error } = await query.single();
+        const { data, error } = await query.maybeSingle();
         if (!error && data) {
           return data as Article;
         }
       }
     } catch (err) {
-      console.warn("Supabase query error on slug lookup, using fallback:", err);
+      console.warn("Supabase getArticleBySlug error:", err);
     }
   }
 
@@ -109,8 +154,10 @@ export async function getArticleBySlug(
 export async function getAllArticles(): Promise<Article[]> {
   if (isSupabaseConfigured()) {
     try {
-      const supabase = await createServerSupabase();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
+        await autoSeedSupabaseIfEmpty(supabase);
+
         const { data, error } = await supabase
           .from("articles")
           .select("*")
@@ -119,9 +166,12 @@ export async function getAllArticles(): Promise<Article[]> {
         if (!error && data) {
           return data as Article[];
         }
+        if (error) {
+          console.warn("Supabase getAllArticles error:", error.message);
+        }
       }
     } catch (err) {
-      console.warn("Supabase query error on getAllArticles:", err);
+      console.warn("Supabase getAllArticles client error:", err);
     }
   }
 
@@ -135,20 +185,20 @@ export async function getAllArticles(): Promise<Article[]> {
 export async function getArticleById(id: string): Promise<Article | null> {
   if (isSupabaseConfigured()) {
     try {
-      const supabase = await createServerSupabase();
+      const supabase = getAdminSupabaseClient();
       if (supabase) {
         const { data, error } = await supabase
           .from("articles")
           .select("*")
           .eq("id", id)
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           return data as Article;
         }
       }
     } catch (err) {
-      console.warn("Supabase query error on getArticleById:", err);
+      console.warn("Supabase getArticleById client error:", err);
     }
   }
 
@@ -180,28 +230,36 @@ export async function createArticle(input: ArticleInput): Promise<Article> {
   };
 
   if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createServerSupabase();
-      if (supabase) {
-        const { data, error } = await supabase
-          .from("articles")
-          .insert(newArticle)
-          .select()
-          .single();
+    const supabase = getAdminSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase client initialization failed.");
+    }
 
-        if (!error && data) {
-          return data as Article;
-        }
-        console.warn("Supabase insert error, saving locally:", error);
-      }
-    } catch (err) {
-      console.warn("Supabase client insert error:", err);
+    const { data, error } = await supabase
+      .from("articles")
+      .insert(newArticle)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert error details:", error);
+      throw new Error(`Database error saving article: ${error.message}`);
+    }
+
+    if (data) {
+      return data as Article;
     }
   }
 
-  // Local fallback
+  // If Supabase is not configured and we are in production serverless
+  if (isServerlessEnvironment()) {
+    throw new Error(
+      "Cloud database connection required in production: On Vercel, articles cannot be saved to the serverless disk. Please add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to your Vercel Project Settings."
+    );
+  }
+
+  // Local development fallback
   const all = await readLocalFile();
-  // Ensure unique slug
   const existingSlugIndex = all.findIndex((a) => a.slug === newArticle.slug);
   if (existingSlugIndex >= 0) {
     newArticle.slug = `${newArticle.slug}-${Date.now().toString().slice(-4)}`;
@@ -218,32 +276,41 @@ export async function updateArticle(
   const now = new Date().toISOString();
 
   if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createServerSupabase();
-      if (supabase) {
-        const updates: Record<string, unknown> = {
-          ...input,
-          updated_at: now,
-        };
-        if (input.status === "published" && !input.published_at) {
-          updates.published_at = now;
-        }
-
-        const { data, error } = await supabase
-          .from("articles")
-          .update(updates)
-          .eq("id", id)
-          .select()
-          .single();
-
-        if (!error && data) {
-          return data as Article;
-        }
-        console.warn("Supabase update error, applying locally:", error);
-      }
-    } catch (err) {
-      console.warn("Supabase update client error:", err);
+    const supabase = getAdminSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase client initialization failed.");
     }
+
+    const updates: Record<string, unknown> = {
+      ...input,
+      updated_at: now,
+    };
+    if (input.status === "published" && !input.published_at) {
+      updates.published_at = now;
+    }
+
+    const { data, error } = await supabase
+      .from("articles")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase update error details:", error);
+      throw new Error(`Database error updating article: ${error.message}`);
+    }
+
+    if (data) {
+      return data as Article;
+    }
+  }
+
+  // If Supabase is not configured and in production serverless
+  if (isServerlessEnvironment()) {
+    throw new Error(
+      "Cloud database connection required in production: On Vercel, article updates cannot be saved to the serverless disk. Please add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to your Vercel Project Settings."
+    );
   }
 
   // Local fallback
@@ -273,16 +340,23 @@ export async function updateArticle(
 
 export async function deleteArticle(id: string): Promise<boolean> {
   if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createServerSupabase();
-      if (supabase) {
-        const { error } = await supabase.from("articles").delete().eq("id", id);
-        if (!error) return true;
-        console.warn("Supabase delete error:", error);
-      }
-    } catch (err) {
-      console.warn("Supabase delete client error:", err);
+    const supabase = getAdminSupabaseClient();
+    if (!supabase) {
+      throw new Error("Supabase client initialization failed.");
     }
+
+    const { error } = await supabase.from("articles").delete().eq("id", id);
+    if (error) {
+      console.error("Supabase delete error details:", error);
+      throw new Error(`Database error deleting article: ${error.message}`);
+    }
+    return true;
+  }
+
+  if (isServerlessEnvironment()) {
+    throw new Error(
+      "Cloud database connection required in production: On Vercel, article deletions cannot be saved to the serverless disk. Please configure Supabase in your Vercel Project Settings."
+    );
   }
 
   // Local fallback
@@ -293,6 +367,53 @@ export async function deleteArticle(id: string): Promise<boolean> {
   }
   await writeLocalFile(filtered);
   return true;
+}
+
+export async function syncLocalArticlesToSupabase(): Promise<{
+  success: boolean;
+  count: number;
+  message: string;
+}> {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      count: 0,
+      message: "Supabase credentials are not configured.",
+    };
+  }
+
+  const supabase = getAdminSupabaseClient();
+  if (!supabase) {
+    return {
+      success: false,
+      count: 0,
+      message: "Could not initialize Supabase admin client.",
+    };
+  }
+
+  const localArticles = await readLocalFile();
+  if (localArticles.length === 0) {
+    return {
+      success: true,
+      count: 0,
+      message: "No local articles to sync.",
+    };
+  }
+
+  const { error } = await supabase.from("articles").upsert(localArticles);
+  if (error) {
+    return {
+      success: false,
+      count: 0,
+      message: `Failed to sync articles: ${error.message}`,
+    };
+  }
+
+  return {
+    success: true,
+    count: localArticles.length,
+    message: `Successfully synced ${localArticles.length} articles to Supabase!`,
+  };
 }
 
 export async function getAdminStats() {
@@ -308,5 +429,6 @@ export async function getAdminStats() {
     totalCount,
     recentArticles,
     isSupabaseConnected: isSupabaseConfigured(),
+    isServerless: isServerlessEnvironment(),
   };
 }

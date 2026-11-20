@@ -8,6 +8,7 @@ export const metadata: Metadata = {
     "The complete collection of essays, reflections, and perspectives published by Hammad Azam.",
 };
 
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function ArticlesPage() {

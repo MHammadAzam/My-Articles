@@ -48,6 +48,7 @@ export function EditArticleClient({ initialArticle }: EditArticleClientProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -60,6 +61,7 @@ export function EditArticleClient({ initialArticle }: EditArticleClientProps) {
 
     const finalStatus = targetStatus || status;
     setIsSaving(true);
+    setErrorMessage(null);
     setSaveStatus("Saving changes...");
 
     try {
@@ -93,7 +95,8 @@ export function EditArticleClient({ initialArticle }: EditArticleClientProps) {
       router.refresh();
     } catch (err: unknown) {
       console.error("Save error:", err);
-      alert(err instanceof Error ? err.message : "Error updating article");
+      const msg = err instanceof Error ? err.message : "Error updating article";
+      setErrorMessage(msg);
       setSaveStatus(null);
     } finally {
       setIsSaving(false);
@@ -231,6 +234,35 @@ export function EditArticleClient({ initialArticle }: EditArticleClientProps) {
         <div className="p-3 bg-[#FAF3E8] border border-[#F0E4D0] rounded-xl text-xs text-[#8F5D24] font-medium flex items-center gap-2">
           <Sparkles size={14} />
           <span>{saveStatus}</span>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {errorMessage && (
+        <div className="p-5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2.5 font-semibold text-red-900">
+              <span className="w-5 h-5 rounded-full bg-red-200 text-red-800 flex items-center justify-center text-xs">!</span>
+              <span>Publishing Error</span>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="text-xs text-red-600 hover:text-red-900 font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-red-700">{errorMessage}</p>
+          {errorMessage.includes("Vercel") && (
+            <div className="pt-2">
+              <Link
+                href="/admin/settings"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 text-xs font-semibold transition-colors"
+              >
+                <span>Open Database Settings &amp; Setup Guide →</span>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

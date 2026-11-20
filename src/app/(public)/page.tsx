@@ -3,6 +3,7 @@ import { getPublishedArticles } from "@/lib/storage/articles";
 import { ArticleCard } from "@/components/public/ArticleCard";
 import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
 
+export const dynamic = "force-dynamic";
 export const revalidate = 0; // Dynamic data
 
 export default async function HomePage() {

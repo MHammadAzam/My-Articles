@@ -6,6 +6,9 @@ import {
 } from "@/lib/storage/articles";
 import { verifyAdminSession } from "@/lib/auth";
 import { slugify, generateExcerpt } from "@/lib/utils";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -37,12 +40,11 @@ export async function GET(
     }
 
     return NextResponse.json(article);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("GET /api/articles/[id] error:", error);
-    return NextResponse.json(
-      { error: "Failed to retrieve article." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to retrieve article.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -102,13 +104,25 @@ export async function PUT(
     }
 
     const updated = await updateArticle(id, updates);
+
+    // Revalidate paths immediately
+    try {
+      revalidatePath("/", "layout");
+      revalidatePath("/articles", "page");
+      revalidatePath(`/articles/${updated.slug}`, "page");
+      if (existing.slug !== updated.slug) {
+        revalidatePath(`/articles/${existing.slug}`, "page");
+      }
+    } catch (revalErr) {
+      console.warn("Revalidation warning:", revalErr);
+    }
+
     return NextResponse.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("PUT /api/articles/[id] error:", error);
-    return NextResponse.json(
-      { error: "Failed to update article." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to update article.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -126,6 +140,7 @@ export async function DELETE(
     }
 
     const { id } = await context.params;
+    const existing = await getArticleById(id);
     const success = await deleteArticle(id);
 
     if (!success) {
@@ -135,12 +150,22 @@ export async function DELETE(
       );
     }
 
+    // Revalidate paths
+    try {
+      revalidatePath("/", "layout");
+      revalidatePath("/articles", "page");
+      if (existing) {
+        revalidatePath(`/articles/${existing.slug}`, "page");
+      }
+    } catch (revalErr) {
+      console.warn("Revalidation warning:", revalErr);
+    }
+
     return NextResponse.json({ success: true, message: "Article deleted successfully." });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("DELETE /api/articles/[id] error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete article." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to delete article.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

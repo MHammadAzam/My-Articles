@@ -6,6 +6,9 @@ import {
 } from "@/lib/storage/articles";
 import { verifyAdminSession } from "@/lib/auth";
 import { slugify, generateExcerpt } from "@/lib/utils";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,12 +29,11 @@ export async function GET(request: NextRequest) {
 
     const published = await getPublishedArticles();
     return NextResponse.json(published);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("GET /api/articles error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch articles." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch articles.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -83,12 +85,22 @@ export async function POST(request: NextRequest) {
       status: status === "published" ? "published" : "draft",
     });
 
+    // Revalidate pages immediately across edge and Next.js router cache
+    try {
+      revalidatePath("/", "layout");
+      revalidatePath("/articles", "page");
+      if (article.status === "published") {
+        revalidatePath(`/articles/${article.slug}`, "page");
+      }
+    } catch (revalErr) {
+      console.warn("Revalidation warning:", revalErr);
+    }
+
     return NextResponse.json(article, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("POST /api/articles error:", error);
-    return NextResponse.json(
-      { error: "Failed to create article." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to create article.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
