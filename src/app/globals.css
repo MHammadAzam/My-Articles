@@ -1,50 +1,64 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --bg-ivory: #FAF8F5;
-    --bg-card: #FFFFFF;
-    --text-charcoal: #1F1E1B;
-    --text-muted: #6E6960;
-    --border-subtle: #EBE6DD;
-    --border-focus: #CBC4B7;
-    --accent-amber: #945B1C;
-    --accent-soft: #F2ECE1;
-  }
-
-  body {
-    background-color: var(--bg-ivory);
-    color: var(--text-charcoal);
-    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  h1, h2, h3, h4, .font-heading {
-    font-family: var(--font-newsreader), Georgia, serif;
-  }
-
-  .font-editorial {
-    font-family: var(--font-source-serif), Georgia, serif;
-  }
+@theme {
+  --font-serif: var(--font-source-serif), Georgia, Cambria, serif;
+  --font-editorial: var(--font-source-serif), Georgia, Cambria, serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-newsreader), Georgia, Cambria, serif;
 }
 
-/* Subtle 3D card tilt & perspective */
+:root {
+  --bg-ivory: #FAF8F5;
+  --bg-card: #FFFFFF;
+  --text-charcoal: #1F1E1B;
+  --text-muted: #6E6960;
+  --border-subtle: #EBE6DD;
+  --border-focus: #CBC4B7;
+  --accent-amber: #945B1C;
+  --accent-soft: #F2ECE1;
+}
+
+html, body {
+  background-color: #FAF8F5;
+  color: #1F1E1B;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Utility Overrides */
+.font-heading {
+  font-family: var(--font-newsreader), Georgia, Cambria, serif !important;
+}
+
+.font-editorial {
+  font-family: var(--font-source-serif), Georgia, Cambria, serif !important;
+}
+
+.font-serif {
+  font-family: var(--font-source-serif), Georgia, Cambria, serif !important;
+}
+
+.font-sans {
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Subtle 3D Card Hover Depth */
 .card-perspective {
   perspective: 1000px;
 }
 
 .card-3d {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
   transform-style: preserve-3d;
   will-change: transform, box-shadow;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .card-3d:hover {
-    transform: translateY(-4px) rotateX(1deg) rotateY(-1deg);
-    box-shadow: 0 16px 32px -8px rgba(31, 30, 27, 0.08), 0 4px 12px -2px rgba(31, 30, 27, 0.04);
+    transform: translateY(-4px) rotateX(1deg) rotateY(-0.75deg);
+    box-shadow: 0 16px 36px -10px rgba(31, 30, 27, 0.08), 0 4px 14px -3px rgba(31, 30, 27, 0.03);
   }
 }
 
@@ -54,31 +68,31 @@
   }
 }
 
-/* Editorial Typography for TipTap Editor and Article Page */
+/* Editorial Reading Typography (Substack / Medium Inspired) */
 .article-prose {
-  font-family: var(--font-source-serif), Georgia, serif;
-  font-size: 1.2rem;
-  line-height: 1.82;
+  font-family: var(--font-source-serif), Georgia, Cambria, serif;
+  font-size: 1.22rem;
+  line-height: 1.84;
   color: #24221E;
 }
 
 @media (max-width: 640px) {
   .article-prose {
-    font-size: 1.08rem;
-    line-height: 1.75;
+    font-size: 1.1rem;
+    line-height: 1.76;
   }
 }
 
 .article-prose p {
-  margin-top: 1.45em;
-  margin-bottom: 1.45em;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
   letter-spacing: -0.003em;
 }
 
 .article-prose h1 {
-  font-family: var(--font-newsreader), Georgia, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif !important;
   font-size: 2.35rem;
-  line-height: 1.25;
+  line-height: 1.24;
   font-weight: 500;
   margin-top: 2em;
   margin-bottom: 0.75em;
@@ -87,20 +101,20 @@
 }
 
 .article-prose h2 {
-  font-family: var(--font-newsreader), Georgia, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif !important;
   font-size: 1.85rem;
   line-height: 1.3;
   font-weight: 500;
-  margin-top: 1.85em;
+  margin-top: 1.9em;
   margin-bottom: 0.65em;
   color: #171614;
   letter-spacing: -0.015em;
 }
 
 .article-prose h3 {
-  font-family: var(--font-newsreader), Georgia, serif;
+  font-family: var(--font-newsreader), Georgia, Cambria, serif !important;
   font-size: 1.45rem;
-  line-height: 1.4;
+  line-height: 1.38;
   font-weight: 600;
   margin-top: 1.6em;
   margin-bottom: 0.5em;
@@ -108,13 +122,13 @@
 }
 
 .article-prose blockquote {
-  margin: 2em 0;
-  padding: 0.5em 0 0.5em 1.5em;
+  margin: 2.2em 0;
+  padding: 0.6em 0 0.6em 1.6em;
   border-left: 2.5px solid #8F5D24;
   font-style: italic;
   color: #4A463F;
-  font-size: 1.15em;
-  line-height: 1.7;
+  font-size: 1.16em;
+  line-height: 1.72;
 }
 
 .article-prose blockquote p {
@@ -123,14 +137,14 @@
 
 .article-prose ul {
   list-style-type: disc;
-  margin: 1.4em 0;
-  padding-left: 1.6em;
+  margin: 1.5em 0;
+  padding-left: 1.75em;
 }
 
 .article-prose ol {
   list-style-type: decimal;
-  margin: 1.4em 0;
-  padding-left: 1.6em;
+  margin: 1.5em 0;
+  padding-left: 1.75em;
 }
 
 .article-prose li {
@@ -141,22 +155,21 @@
 .article-prose a {
   color: #1F1E1B;
   text-decoration: underline;
-  text-decoration-color: #A36A00;
+  text-decoration-color: #8F5D24;
   text-underline-offset: 4px;
   transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
 .article-prose a:hover {
-  color: #945B1C;
-  text-decoration-color: #945B1C;
+  color: #8F5D24;
 }
 
 .article-prose img {
-  border-radius: 6px;
+  border-radius: 8px;
   margin: 2.5em auto;
   max-width: 100%;
   height: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
 }
 
 .article-prose strong {
@@ -176,7 +189,7 @@
 /* TipTap Editor Styles */
 .tiptap-container .tiptap {
   outline: none;
-  min-height: 380px;
+  min-height: 420px;
 }
 
 .tiptap-container .tiptap p.is-editor-empty:first-child::before {
