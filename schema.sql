@@ -50,9 +50,12 @@ CREATE TRIGGER trigger_articles_updated_at
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
 
--- 4b. Explicit Table Grants (Ensures PostgREST roles can access the table)
+-- 4b. Explicit Table & Schema Grants (Resolves PostgreSQL Error 42501)
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.articles TO postgres, service_role, authenticated, anon;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role, authenticated, anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, service_role, authenticated, anon;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, service_role, authenticated, anon;
 
 -- 5. Strict RLS Policies
 -- A. PUBLIC ACCESS: Anyone can read articles ONLY if their status is 'published'
