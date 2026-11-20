@@ -26,13 +26,14 @@ export async function GET() {
 
   const checkKeyFormat = (k: string) => {
     if (!k) return { configured: false };
+    const parts = k.split("_");
     return {
       configured: true,
       length: k.length,
       isJWT: k.startsWith("eyJ"),
       dotCount: (k.match(/\./g) || []).length,
       hasBearer: k.toLowerCase().startsWith("bearer "),
-      startsWithSbp: k.startsWith("sbp_"),
+      keyPrefix: parts.length > 1 ? `${parts[0]}_${parts[1] || ""}` : "raw",
     };
   };
 
@@ -70,23 +71,18 @@ export async function GET() {
       const client = createClient(url, serviceKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
-      const { count, error } = await client
+      const res = await client
         .from("articles")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact" })
+        .limit(1);
 
-      if (error) {
-        serviceRoleTest = {
-          success: false,
-          error: JSON.stringify({
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          }),
-        };
-      } else {
-        serviceRoleTest = { success: true, count };
-      }
+      serviceRoleTest = {
+        success: !res.error,
+        count: res.count,
+        error: res.error
+          ? `[${res.status} ${res.statusText}] ${res.error.message || ""} (code: ${res.error.code}, details: ${res.error.details})`
+          : undefined,
+      };
     } catch (err: unknown) {
       serviceRoleTest = {
         success: false,
@@ -107,24 +103,19 @@ export async function GET() {
       const client = createClient(url, anonKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
-      const { count, error } = await client
+      const res = await client
         .from("articles")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "published");
+        .select("*", { count: "exact" })
+        .eq("status", "published")
+        .limit(1);
 
-      if (error) {
-        anonRoleTest = {
-          success: false,
-          error: JSON.stringify({
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          }),
-        };
-      } else {
-        anonRoleTest = { success: true, count };
-      }
+      anonRoleTest = {
+        success: !res.error,
+        count: res.count,
+        error: res.error
+          ? `[${res.status} ${res.statusText}] ${res.error.message || ""} (code: ${res.error.code}, details: ${res.error.details})`
+          : undefined,
+      };
     } catch (err: unknown) {
       anonRoleTest = {
         success: false,
