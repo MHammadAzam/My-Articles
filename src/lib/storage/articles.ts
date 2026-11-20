@@ -94,19 +94,24 @@ export async function getPublishedArticles(): Promise<Article[]> {
           .eq("status", "published")
           .order("published_at", { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data as Article[];
         }
         if (error) {
-          console.warn("Supabase getPublishedArticles error, falling back:", error.message);
+          console.warn("Supabase getPublishedArticles error:", error.message);
         }
       }
     } catch (err) {
-      console.warn("Supabase client query error, falling back:", err);
+      console.warn("Supabase client query error:", err);
     }
   }
 
-  // Local fallback
+  // In production serverless, never depend on stale local JSON
+  if (isServerlessEnvironment()) {
+    return [];
+  }
+
+  // Local development fallback
   const all = await readLocalFile();
   return all
     .filter((a) => a.status === "published")
@@ -130,16 +135,22 @@ export async function getArticleBySlug(
           query = query.eq("status", "published");
         }
         const { data, error } = await query.maybeSingle();
-        if (!error && data) {
-          return data as Article;
+        if (!error) {
+          return (data as Article) || null;
         }
+        console.warn("Supabase getArticleBySlug error:", error.message);
       }
     } catch (err) {
       console.warn("Supabase getArticleBySlug error:", err);
     }
   }
 
-  // Local fallback
+  // In production serverless, never depend on stale local JSON
+  if (isServerlessEnvironment()) {
+    return null;
+  }
+
+  // Local development fallback
   const all = await readLocalFile();
   const found = all.find((a) => a.slug === slug);
   if (!found) return null;
@@ -175,6 +186,11 @@ export async function getAllArticles(): Promise<Article[]> {
     }
   }
 
+  // In production serverless, never depend on stale local JSON
+  if (isServerlessEnvironment()) {
+    return [];
+  }
+
   // Local fallback
   const all = await readLocalFile();
   return all.sort(
@@ -200,6 +216,11 @@ export async function getArticleById(id: string): Promise<Article | null> {
     } catch (err) {
       console.warn("Supabase getArticleById client error:", err);
     }
+  }
+
+  // In production serverless, never depend on stale local JSON
+  if (isServerlessEnvironment()) {
+    return null;
   }
 
   // Local fallback
